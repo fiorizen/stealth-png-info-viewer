@@ -254,49 +254,73 @@ function createResultCard(file, metadata) {
 function updateDiffs() {
   const cards = Array.from(resultsContainer.children);
   
+  // Reset all highlights first
   document.querySelectorAll('.diff-highlight').forEach(el => {
     el.classList.remove('diff-highlight');
   });
 
-  if (cards.length < 2) return;
+  if (cards.length < 2) return; // Need at least 2 cards to diff? Actually with bidirectional, maybe not.
+  // But if only 1 card, nothing to compare to.
 
-  for (let i = 0; i < cards.length - 1; i++) {
+  // Iterate ALL cards to apply bidirectional diffs
+  for (let i = 0; i < cards.length; i++) {
     const currentCard = cards[i];
-    const nextCard = cards[i + 1];
-    
     const currentMeta = cardMetadataMap.get(currentCard);
-    const nextMeta = cardMetadataMap.get(nextCard);
-
-    if (!currentMeta || !nextMeta) continue;
-
+    if (!currentMeta) continue;
     const currentSD = currentMeta.parameters ? parseStableDiffusionParameters(currentMeta.parameters) : null;
-    const nextSD = nextMeta.parameters ? parseStableDiffusionParameters(nextMeta.parameters) : null;
+    if (!currentSD) continue;
 
-    if (currentSD && nextSD) {
+    const neighbors = [];
+    
+    // Check Previous (Newer in list)
+    if (i > 0) {
+      const prevCard = cards[i - 1];
+      const prevMeta = cardMetadataMap.get(prevCard);
+      if (prevMeta && prevMeta.parameters) {
+        neighbors.push(parseStableDiffusionParameters(prevMeta.parameters));
+      }
+    }
+    
+    // Check Next (Older in list)
+    if (i < cards.length - 1) {
+      const nextCard = cards[i + 1];
+      const nextMeta = cardMetadataMap.get(nextCard);
+      if (nextMeta && nextMeta.parameters) {
+        neighbors.push(parseStableDiffusionParameters(nextMeta.parameters));
+      }
+    }
+
+    if (neighbors.length > 0) {
+      // Diff Prompt
       diffText(
         currentCard.querySelector('[data-type="prompt"]'),
         currentSD.prompt,
-        nextSD.prompt
+        neighbors.map(n => n.prompt)
       );
+      // Diff Negative Prompt
       diffText(
         currentCard.querySelector('[data-type="negativePrompt"]'),
         currentSD.negativePrompt,
-        nextSD.negativePrompt
+        neighbors.map(n => n.negativePrompt)
       );
+      // Diff Other Params
       diffParams(
         currentCard.querySelector('[data-type="otherParams"]'),
         currentSD.params,
-        nextSD.params
+        neighbors.map(n => n.params)
       );
     }
   }
 }
 
-function diffText(container, currentText, nextText) {
-  if (!container || !currentText || !nextText) return;
+function diffText(container, currentText, neighborTexts) {
+  if (!container || !currentText) return;
+  if (!neighborTexts || neighborTexts.length === 0) return;
   
   const currentParts = currentText.split(/,\s*/);
-  const nextParts = new Set(nextText.split(/,\s*/));
+  
+  // Create Sets for each neighbor for fast lookup
+  const neighborSets = neighborTexts.map(text => new Set(text ? text.split(/,\s*/) : []));
   
   const resultParts = [];
 
@@ -305,10 +329,25 @@ function diffText(container, currentText, nextText) {
     const trimmedPart = part.trim();
     
     let displayPart = part;
-    let isDiff = !nextParts.has(trimmedPart);
+    
+    // Check if this part is missing in ANY neighbor
+    // "Bidirectional" means: if I am different from neighbor X, highlight me.
+    // If I have neighbor A and B.
+    // If A doesn't have me -> Highlight.
+    // If B doesn't have me -> Highlight.
+    let isDiff = false;
+    
+    if (trimmedPart.length > 0) {
+        for (const neighborSet of neighborSets) {
+            if (!neighborSet.has(trimmedPart)) {
+                isDiff = true;
+                break;
+            }
+        }
+    }
     
     // Highlight logic
-    if (isDiff && trimmedPart.length > 0) {
+    if (isDiff) {
       // Split by BREAK to avoid highlighting it
       const tokens = part.split(/(BREAK)/);
       displayPart = tokens.map(token => {
@@ -336,12 +375,23 @@ function diffText(container, currentText, nextText) {
   container.innerHTML = resultParts.join('');
 }
 
-function diffParams(container, currentParams, nextParams) {
+function diffParams(container, currentParams, neighborParamsList) {
   if (!container) return;
   const paramSpans = container.querySelectorAll('[data-param-key]');
+  
   paramSpans.forEach(span => {
     const key = span.dataset.paramKey;
-    if (currentParams[key] !== nextParams[key]) {
+    const currentVal = currentParams[key];
+    
+    let isDiff = false;
+    for (const neighborParams of neighborParamsList) {
+        if (currentVal !== neighborParams[key]) {
+            isDiff = true;
+            break;
+        }
+    }
+    
+    if (isDiff) {
       span.classList.add('diff-highlight');
     }
   });

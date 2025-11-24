@@ -100,13 +100,15 @@ body {
 
 #results-container {
   width: 100%;
-  max-width: 1600px;
-  /* Increased max-width for gallery */
+  max-width: 98%;
+  /* Allow full width for 4K screens */
   margin: 0 auto;
   padding: 2rem;
   box-sizing: border-box;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(600px, 1fr));
+  /* Reduced min-width to 500px to allow 3 columns on standard 1080p/1440p screens */
+  /* On 4K, this will allow 6-7 columns */
+  grid-template-columns: repeat(auto-fill, minmax(500px, 1fr));
   gap: 2rem;
   align-items: start;
   /* Prevent stretching if heights differ */
@@ -140,6 +142,12 @@ body {
   animation: slideDown 0.5s ease;
 }
 
+/* Make card internals responsive based on card width (approximate via media query for now) */
+/* If screen is narrow, force single column. But also if grid makes cards narrow... */
+/* Since we can't use container queries easily without polyfill in standard CSS yet (though support is good now),
+   we'll rely on the minmax(500px). 500px is enough for 2 columns (250px each).
+   Below 768px viewport, we force single column on the card.
+*/
 @media (max-width: 768px) {
   .result-card {
     grid-template-columns: 1fr;

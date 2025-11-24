@@ -9,6 +9,7 @@
   --accent-color: #00d2ff;
   --accent-gradient: linear-gradient(90deg, #00d2ff 0%, #3a7bd5 100%);
   --font-family: 'Inter', sans-serif;
+  --header-height: 80px;
 }
 
 body {
@@ -19,12 +20,10 @@ body {
   background-size: 200% 200%;
   animation: gradientBG 15s ease infinite;
   color: var(--text-primary);
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  overflow-x: hidden;
+  height: 100vh;
+  /* Fixed height for scroll snapping */
+  overflow: hidden;
+  /* Prevent body scroll, use container */
 }
 
 @keyframes gradientBG {
@@ -41,11 +40,73 @@ body {
   }
 }
 
+/* Header */
+#app-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: var(--header-height);
+  background: rgba(15, 12, 41, 0.8);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--glass-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 2rem;
+  box-sizing: border-box;
+  z-index: 100;
+}
+
+#app-header h1 {
+  font-size: 1.5rem;
+  margin: 0;
+  background: var(--accent-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.glass-btn {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  color: var(--text-primary);
+  padding: 0.5rem 1.5rem;
+  font-size: 1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all 0.2s ease;
+}
+
+.glass-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--accent-color);
+}
+
+/* Main App Container */
 #app {
   width: 100%;
+  height: 100%;
+  padding-top: var(--header-height);
+  box-sizing: border-box;
+  overflow-y: auto;
+  scroll-snap-type: y mandatory;
+  /* Scroll Snapping */
+  scroll-behavior: smooth;
+}
+
+#results-container {
+  width: 100%;
   max-width: 1200px;
+  margin: 0 auto;
   padding: 2rem;
   box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
 }
 
 /* Glassmorphism Card */
@@ -57,62 +118,12 @@ body {
   border-radius: 16px;
   box-shadow: var(--glass-shadow);
   padding: 2rem;
-  margin-bottom: 2rem;
   transition: box-shadow 0.3s ease;
   position: relative;
-  /* For absolute positioning of remove button */
-}
 
-.glass-card:hover {
-  /* transform: translateY(-5px); Removed as requested */
-  box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.5);
-}
-
-h1 {
-  font-size: 3rem;
-  font-weight: 800;
-  text-align: center;
-  margin-bottom: 2rem;
-  background: var(--accent-gradient);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  letter-spacing: -0.05em;
-}
-
-/* Dropzone */
-#dropzone {
-  border: 2px dashed var(--glass-border);
-  border-radius: 16px;
-  padding: 4rem 2rem;
-  text-align: center;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  position: relative;
-  overflow: hidden;
-}
-
-#dropzone.dragover {
-  border-color: var(--accent-color);
-  background: rgba(0, 210, 255, 0.1);
-}
-
-#dropzone p {
-  font-size: 1.2rem;
-  color: var(--text-secondary);
-}
-
-.icon-upload {
-  font-size: 3rem;
-  margin-bottom: 1rem;
-  display: block;
-  color: var(--text-secondary);
-}
-
-/* Result Area */
-#results-container {
-  display: flex;
-  flex-direction: column;
-  gap: 2rem;
+  /* Scroll Snap Item */
+  scroll-snap-align: start;
+  scroll-margin-top: calc(var(--header-height) + 2rem);
 }
 
 .result-card {
@@ -158,7 +169,9 @@ h1 {
 }
 
 .info-label {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   font-size: 0.9rem;
   color: var(--text-secondary);
   margin-bottom: 0.5rem;
@@ -207,19 +220,18 @@ details .info-value {
   margin-top: 0;
 }
 
-/* Copy Button */
+/* Copy Button - Moved to Label */
 .copy-btn {
-  position: absolute;
-  top: 0.5rem;
-  right: 0.5rem;
   background: rgba(255, 255, 255, 0.1);
   border: none;
   border-radius: 4px;
   color: var(--text-secondary);
   cursor: pointer;
-  padding: 0.25rem 0.5rem;
-  font-size: 0.8rem;
+  padding: 0.15rem 0.5rem;
+  font-size: 0.7rem;
   transition: background 0.2s;
+  margin-left: auto;
+  /* Push to right if flex container */
 }
 
 .copy-btn:hover {
@@ -263,16 +275,41 @@ details .info-value {
   font-weight: bold;
 }
 
-/* Footer */
-footer {
-  margin-top: auto;
-  padding: 2rem;
-  text-align: center;
-  color: var(--text-secondary);
-  font-size: 0.9rem;
+/* Drag Overlay */
+#drag-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(5px);
+  z-index: 1000;
+  display: none;
+  /* Hidden by default */
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  pointer-events: none;
+  /* Allow events to pass through to window listeners */
 }
 
-footer a {
+#drag-overlay.active {
+  display: flex;
+}
+
+.overlay-content {
+  text-align: center;
   color: var(--accent-color);
-  text-decoration: none;
+}
+
+.overlay-content .icon-upload {
+  font-size: 5rem;
+  display: block;
+  margin-bottom: 1rem;
+}
+
+.overlay-content p {
+  font-size: 2rem;
+  font-weight: bold;
 }

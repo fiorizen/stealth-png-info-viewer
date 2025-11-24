@@ -315,12 +315,25 @@ function diffText(container, currentText, nextText) {
   
   const newHtmlParts = currentParts.map(part => {
     let displayPart = part;
+    // Format BREAK first
     if (part.includes("BREAK")) {
         displayPart = part.replace(/\bBREAK(?:,\s?|\s|\b)/g, '$&<br>');
     }
 
     if (!nextParts.has(part.trim())) {
-      return `<span class="diff-highlight">${displayPart}</span>`;
+      // Highlight the part, but exclude "BREAK" keyword from the highlight class
+      // We wrap the whole thing in diff-highlight, but close it before BREAK and reopen after
+      
+      // 1. Wrap BREAK(and <br>) in a marker that closes and reopens the span
+      // The regex matches BREAK followed by optional <br> (added by formatting above)
+      const highlightExclusionRegex = /(\bBREAK(?:<br>)?)/g;
+      
+      // We want the result to be: <span class="diff-highlight">...</span> BREAK<br> <span class="diff-highlight">...</span>
+      // So we replace BREAK with: </span>BREAK<br><span class="diff-highlight">
+      
+      const highlightedContent = displayPart.replace(highlightExclusionRegex, '</span>$1<span class="diff-highlight">');
+      
+      return `<span class="diff-highlight">${highlightedContent}</span>`;
     }
     return displayPart;
   });

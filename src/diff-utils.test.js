@@ -2,122 +2,135 @@ import { describe, expect, it } from 'vitest';
 import { generateDiffHtml } from './diff-utils.js';
 
 describe('generateDiffHtml', () => {
-  it('should return original text if no neighbors', () => {
+  it('should return original text if only one text', () => {
     const text = 'hello world';
-    expect(generateDiffHtml(text, [])).toBe('hello world');
+    expect(generateDiffHtml(text, [text])).toBe('hello world');
   });
 
   it('should highlight added words', () => {
     const current = 'hello, world';
-    const neighbor = 'hello';
-    // "world" is missing in neighbor, so it should be highlighted
+    const other = 'hello';
+    // "world" is missing in other, so it should be highlighted
+    // allTexts includes current
     const expected = 'hello, <span class="diff-highlight">world</span>';
-    expect(generateDiffHtml(current, [neighbor])).toBe(expected);
+    expect(generateDiffHtml(current, [current, other])).toBe(expected);
   });
 
   it('should highlight changed words', () => {
     const current = 'hello, world';
-    const neighbor = 'hello, there';
-    // "world" is missing in neighbor
+    const other = 'hello, there';
+    // "world" is missing in other
+    // allTexts includes current
     const expected = 'hello, <span class="diff-highlight">world</span>';
-    expect(generateDiffHtml(current, [neighbor])).toBe(expected);
+    expect(generateDiffHtml(current, [current, other])).toBe(expected);
   });
 
-  it('should support bidirectional diff (highlight if missing from ANY neighbor)', () => {
-    const current = 'A, B, C';
-    const prev = 'A, C'; // Missing B
-    const next = 'A, B'; // Missing C
+  it('should support global diff (highlight if not in ALL texts)', () => {
+    const text1 = 'A, B, C';
+    const text2 = 'A, C'; // Missing B
+    const text3 = 'A, B'; // Missing C
     
-    // B is missing in prev (but present in next) -> Highlight B
-    // C is missing in next (but present in prev) -> Highlight C
-    // With new logic: highlight if missing from ANY neighbor
-    const expected = 'A, <span class="diff-highlight">B</span>, <span class="diff-highlight">C</span>';
-    expect(generateDiffHtml(current, [prev, next])).toBe(expected);
+    // For text1: B is missing in text2, C is missing in text3 -> Both highlighted
+    // A is common to all -> Not highlighted
+    const expected1 = 'A, <span class="diff-highlight">B</span>, <span class="diff-highlight">C</span>';
+    expect(generateDiffHtml(text1, [text1, text2, text3])).toBe(expected1);
+    
+    // For text2: B is missing (not in text2), C is common to text1 and text2 but not text3 -> C highlighted
+    const expected2 = 'A, <span class="diff-highlight">C</span>';
+    expect(generateDiffHtml(text2, [text1, text2, text3])).toBe(expected2);
+    
+    // For text3: C is missing (not in text3), B is common to text1 and text3 but not text2 -> B highlighted
+    const expected3 = 'A, <span class="diff-highlight">B</span>';
+    expect(generateDiffHtml(text3, [text1, text2, text3])).toBe(expected3);
   });
 
   it('should handle multi-word phrases correctly', () => {
     const current = 'averting eyes, looking at viewer';
-    const neighbor = 'upturned eyes, looking at viewer';
+    const other = 'upturned eyes, looking at viewer';
     
-    // "averting eyes" is missing in neighbor -> Highlight entire phrase
-    // "upturned eyes" is in neighbor but not current -> No highlight in current
+    // "averting eyes" is missing in other -> Highlight entire phrase
     // "looking at viewer" is common -> No highlight
     const expected = '<span class="diff-highlight">averting eyes</span>, looking at viewer';
-    expect(generateDiffHtml(current, [neighbor])).toBe(expected);
+    expect(generateDiffHtml(current, [current, other])).toBe(expected);
   });
 
-  it('should highlight all different phrases in a set', () => {
-    const current1 = 'averting eyes, smiling';
-    const current2 = 'upturned eyes, smiling';
-    const current3 = 'looking back, smiling';
+  it('should highlight all different phrases in a set (global)', () => {
+    const text1 = 'averting eyes, smiling';
+    const text2 = 'upturned eyes, smiling';
+    const text3 = 'looking back, smiling';
     
-    // For current1: "averting eyes" is missing in both neighbors -> Highlight
+    // Common to all: "smiling"
+    // For text1: "averting eyes" is unique -> Highlight
     const expected1 = '<span class="diff-highlight">averting eyes</span>, smiling';
-    expect(generateDiffHtml(current1, [current2, current3])).toBe(expected1);
+    expect(generateDiffHtml(text1, [text1, text2, text3])).toBe(expected1);
     
-    // For current2: "upturned eyes" is missing in both neighbors -> Highlight
+    // For text2: "upturned eyes" is unique -> Highlight
     const expected2 = '<span class="diff-highlight">upturned eyes</span>, smiling';
-    expect(generateDiffHtml(current2, [current1, current3])).toBe(expected2);
+    expect(generateDiffHtml(text2, [text1, text2, text3])).toBe(expected2);
     
-    // For current3: "looking back" is missing in both neighbors -> Highlight
+    // For text3: "looking back" is unique -> Highlight
     const expected3 = '<span class="diff-highlight">looking back</span>, smiling';
-    expect(generateDiffHtml(current3, [current1, current2])).toBe(expected3);
+    expect(generateDiffHtml(text3, [text1, text2, text3])).toBe(expected3);
+  });
+
+  it('should handle user-reported case correctly', () => {
+    const text1 = 'looking up BREAK amazuyu tatsuki, tomose shunsaku BREAK masterpiece';
+    const text2 = 'looking up BREAK mibu natsuki, amazuyu tatsuki BREAK masterpiece';
+    const text3 = 'looking up BREAK misaki kurehito, mibu natsuki BREAK masterpiece';
+    
+    // Common to all: "looking up", "masterpiece"
+    // For text2: "mibu natsuki" and "amazuyu tatsuki" are unique -> Both highlighted
+    const expected2 = 'looking up BREAK<br><span class="diff-highlight">mibu natsuki</span>, <span class="diff-highlight">amazuyu tatsuki</span> BREAK<br>masterpiece';
+    expect(generateDiffHtml(text2, [text1, text2, text3])).toBe(expected2);
   });
 
   describe('BREAK handling', () => {
     it('should format BREAK with <br>', () => {
       const current = 'foo BREAK bar';
-      const neighbor = 'foo BREAK bar';
-      // BREAK should be followed by <br>
       const expected = 'foo BREAK<br>bar';
-      expect(generateDiffHtml(current, [neighbor])).toBe(expected);
+      expect(generateDiffHtml(current, [current])).toBe(expected);
     });
 
-    it('should NOT highlight BREAK keyword itself even if missing in neighbor', () => {
+    it('should NOT highlight BREAK keyword itself', () => {
       const current = 'foo BREAK bar';
-      const neighbor = 'foo, bar';
-      // BREAK is missing in neighbor but is a delimiter, not content
+      const other = 'foo, bar';
+      // BREAK is a delimiter, not content
       // "foo" and "bar" are common -> No highlight
       const expected = 'foo BREAK<br>bar';
-      expect(generateDiffHtml(current, [neighbor])).toBe(expected);
+      expect(generateDiffHtml(current, [current, other])).toBe(expected);
     });
 
     it('should handle BREAK without spaces', () => {
       const current = 'foo\nBREAK\nbar';
-      const neighbor = 'foo, bar';
-      // \nBREAK\n matches \s*\bBREAK\b\s*
+      const other = 'foo, bar';
       const expected = 'foo\nBREAK<br>bar';
-      expect(generateDiffHtml(current, [neighbor])).toBe(expected);
+      expect(generateDiffHtml(current, [current, other])).toBe(expected);
     });
 
     it('should handle BREAK with comma correctly (newline after comma)', () => {
       const current = 'foo, BREAK, bar';
-      const neighbor = 'foo, BREAK, bar';
-      
-      // Expected: foo, BREAK,<br>bar
       const expected = 'foo, BREAK,<br>bar';
-      expect(generateDiffHtml(current, [neighbor])).toBe(expected);
+      expect(generateDiffHtml(current, [current])).toBe(expected);
     });
   });
 
   describe('Regression Cases', () => {
     it('should handle "masterpiece" correctly (not confuse with comma)', () => {
       const current = 'masterpiece, best quality';
-      const neighbor = 'best quality';
+      const other = 'best quality';
       // "masterpiece" should be highlighted.
       const expected = '<span class="diff-highlight">masterpiece</span>, best quality';
-      expect(generateDiffHtml(current, [neighbor])).toBe(expected);
+      expect(generateDiffHtml(current, [current, other])).toBe(expected);
     });
 
     it('should handle "armored dress" correctly (not confuse with BREAK)', () => {
       const current = 'BREAK armored dress BREAK';
-      const neighbor = 'BREAK sailor BREAK';
+      const other = 'BREAK sailor BREAK';
       
-      // "armored dress" is missing in neighbor -> Highlight entire phrase
+      // "armored dress" is missing in other -> Highlight entire phrase
       // BREAKs are delimiters -> No highlight, just format
-      // Note: There's a space after first BREAK that's part of the phrase
       const expected = 'BREAK<br><span class="diff-highlight">armored dress</span> BREAK<br>';
-      expect(generateDiffHtml(current, [neighbor])).toBe(expected);
+      expect(generateDiffHtml(current, [current, other])).toBe(expected);
     });
   });
 });

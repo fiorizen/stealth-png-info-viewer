@@ -259,10 +259,13 @@ function updateDiffs() {
     el.classList.remove('diff-highlight');
   });
 
-  if (cards.length < 2) return; // Need at least 2 cards to diff? Actually with bidirectional, maybe not.
-  // But if only 1 card, nothing to compare to.
+  if (cards.length < 2) return; // Need at least 2 cards for diff
 
-  // Iterate ALL cards to apply bidirectional diffs
+  // Collect ALL metadata from all cards
+  const allMetadata = cards.map(card => cardMetadataMap.get(card)).filter(meta => meta && meta.parameters);
+  const allSD = allMetadata.map(meta => parseStableDiffusionParameters(meta.parameters));
+  
+  // Iterate ALL cards to apply global diffs
   for (let i = 0; i < cards.length; i++) {
     const currentCard = cards[i];
     const currentMeta = cardMetadataMap.get(currentCard);
@@ -270,79 +273,59 @@ function updateDiffs() {
     const currentSD = currentMeta.parameters ? parseStableDiffusionParameters(currentMeta.parameters) : null;
     if (!currentSD) continue;
 
-    const neighbors = [];
+    // Diff Prompt - pass ALL prompts (including current)
+    diffText(
+      currentCard.querySelector('[data-type="prompt"]'),
+      currentSD.prompt,
+      allSD.map(sd => sd.prompt)
+    );
     
-    // Check Previous (Newer in list)
-    if (i > 0) {
-      const prevCard = cards[i - 1];
-      const prevMeta = cardMetadataMap.get(prevCard);
-      if (prevMeta && prevMeta.parameters) {
-        neighbors.push(parseStableDiffusionParameters(prevMeta.parameters));
-      }
-    }
+    // Diff Negative Prompt - pass ALL negative prompts
+    diffText(
+      currentCard.querySelector('[data-type="negativePrompt"]'),
+      currentSD.negativePrompt,
+      allSD.map(sd => sd.negativePrompt)
+    );
     
-    // Check Next (Older in list)
-    if (i < cards.length - 1) {
-      const nextCard = cards[i + 1];
-      const nextMeta = cardMetadataMap.get(nextCard);
-      if (nextMeta && nextMeta.parameters) {
-        neighbors.push(parseStableDiffusionParameters(nextMeta.parameters));
-      }
-    }
-
-    if (neighbors.length > 0) {
-      // Diff Prompt
-      diffText(
-        currentCard.querySelector('[data-type="prompt"]'),
-        currentSD.prompt,
-        neighbors.map(n => n.prompt)
-      );
-      // Diff Negative Prompt
-      diffText(
-        currentCard.querySelector('[data-type="negativePrompt"]'),
-        currentSD.negativePrompt,
-        neighbors.map(n => n.negativePrompt)
-      );
-      // Diff Other Params
-      diffParams(
-        currentCard.querySelector('[data-type="otherParams"]'),
-        currentSD.params,
-        neighbors.map(n => n.params)
-      );
-    }
+    // Diff Other Params - pass ALL params
+    diffParams(
+      currentCard.querySelector('[data-type="otherParams"]'),
+      currentSD.params,
+      allSD.map(sd => sd.params)
+    );
   }
 }
 
 import { generateDiffHtml } from './diff-utils.js';
 
-function diffText(container, currentText, neighborTexts) {
+function diffText(container, currentText, allTexts) {
   if (!container || !currentText) return;
-  // If no neighbors, we might still want to format it?
-  // The original logic returned if no neighbors.
-  // But generateDiffHtml handles formatting too.
-  // Let's pass empty array if undefined.
-  const neighbors = neighborTexts || [];
-  
-  container.innerHTML = generateDiffHtml(currentText, neighbors);
+  // Pass all texts (including current) to generateDiffHtml
+  const texts = allTexts || [currentText];
+  container.innerHTML = generateDiffHtml(currentText, texts);
 }
 
-function diffParams(container, currentParams, neighborParamsList) {
+function diffParams(container, currentParams, allParamsList) {
   if (!container) return;
   const paramSpans = container.querySelectorAll('[data-param-key]');
   
+  // Find common params: params that exist in ALL param sets with the SAME value
+  const commonParams = new Set();
+  if (allParamsList && allParamsList.length > 0) {
+    Object.keys(currentParams).forEach(key => {
+      const currentVal = currentParams[key];
+      // Check if this key-value pair exists in ALL param sets
+      const existsInAll = allParamsList.every(params => params[key] === currentVal);
+      if (existsInAll) {
+        commonParams.add(key);
+      }
+    });
+  }
+  
   paramSpans.forEach(span => {
     const key = span.dataset.paramKey;
-    const currentVal = currentParams[key];
-    
-    let isDiff = false;
-    for (const neighborParams of neighborParamsList) {
-        if (currentVal !== neighborParams[key]) {
-            isDiff = true;
-            break;
-        }
-    }
-    
-    if (isDiff) {
+    // Highlight if NOT in common params
+    if (!commonParams.has(key)) {
       span.classList.add('diff-highlight');
     }
   });

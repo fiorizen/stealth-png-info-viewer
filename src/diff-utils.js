@@ -10,35 +10,39 @@ function formatBreak(text) {
 }
 
 /**
- * Generates HTML string with diff highlights for the given text compared to neighbor texts.
+ * Generates HTML string with diff highlights for the given text compared to all texts.
  * @param {string} currentText - The text to display and highlight.
- * @param {string[]} neighborTexts - Array of texts from neighboring items (prev/next) to compare against.
+ * @param {string[]} allTexts - Array of ALL texts (including current) to compare against.
  * @returns {string} HTML string with <span class="diff-highlight"> wrapping changed parts.
  */
-export function generateDiffHtml(currentText, neighborTexts) {
+export function generateDiffHtml(currentText, allTexts) {
   if (!currentText) return '';
-  if (!neighborTexts || neighborTexts.length === 0) {
-    // No neighbors, just format BREAK and return
+  if (!allTexts || allTexts.length <= 1) {
+    // Only one text total (or no texts), just format BREAK and return
     return formatBreak(currentText);
   }
   
   // Tokenize logic: Split by comma OR BREAK, capturing the delimiters.
-  // We match:
-  // 1. Comma with optional whitespace: \s*,\s*
-  // 2. BREAK with optional whitespace: \s*\bBREAK\b\s*
-  // NOTE: We do NOT split on whitespace to keep multi-word phrases together
   const splitRegex = /(\s*,\s*|\s*\bBREAK\b\s*)/;
   
-  // Split and filter out empty strings resulting from adjacent delimiters
+  // Split and filter out empty strings
   const currentParts = currentText.split(splitRegex).filter(p => p.length > 0);
   
-  // Create Sets for neighbors
-  const neighborSets = neighborTexts.map(text => {
+  // Create Sets for all texts (tokenize each text)
+  const allTokenSets = allTexts.map(text => {
     if (!text) return new Set();
     const parts = text.split(splitRegex);
     // Filter: keep only "content" tokens (not delimiters, not empty)
     return new Set(parts.filter(p => !p.match(splitRegex) && p.trim().length > 0).map(p => p.trim()));
   });
+  
+  // Find common tokens: tokens that exist in ALL texts
+  // Start with first set, then filter to only tokens present in all other sets
+  const commonTokens = allTokenSets.length > 0 
+    ? new Set([...allTokenSets[0]].filter(token => 
+        allTokenSets.every(set => set.has(token))
+      ))
+    : new Set();
   
   const resultParts = [];
 
@@ -57,16 +61,9 @@ export function generateDiffHtml(currentText, neighborTexts) {
         continue;
       }
       
-      // Check for diff
-      // A token should be highlighted if it's missing from ANY neighbor
-      // (i.e., NOT present in ALL neighbors)
-      let isDiff = false;
-      if (neighborSets.length > 0) {
-        // Check if the token exists in ALL neighbor sets
-        const existsInAllNeighbors = neighborSets.every(neighborSet => neighborSet.has(trimmedPart));
-        // If it doesn't exist in all neighbors, it's different
-        isDiff = !existsInAllNeighbors;
-      }
+      // Highlight if NOT in common tokens
+      // (i.e., not present in ALL images)
+      const isDiff = !commonTokens.has(trimmedPart);
       
       if (isDiff) {
         resultParts.push(`<span class="diff-highlight">${part}</span>`);

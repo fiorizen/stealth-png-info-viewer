@@ -4,6 +4,7 @@ const fileInput = document.getElementById('fileInput');
 const openBtn = document.getElementById('open-btn');
 const resultsContainer = document.getElementById('results-container');
 const dragOverlay = document.getElementById('drag-overlay');
+const appContainer = document.getElementById('app'); // For scroll snapping
 
 // Store metadata for diff calculation
 const cardMetadataMap = new Map();
@@ -56,6 +57,7 @@ fileInput.addEventListener('change', (e) => {
 
 async function handleFiles(files) {
   const filesArray = Array.from(files);
+  let hasUpdates = false;
   
   // Process in reverse so first selected is top
   for (const file of filesArray) {
@@ -63,8 +65,34 @@ async function handleFiles(files) {
       console.warn(`Skipping non-PNG file: ${file.name}`);
       continue;
     }
+    
+    // Check for duplicate filename
+    const existingCard = findCardByFilename(file.name);
+    if (existingCard) {
+      // Remove old card
+      existingCard.remove();
+      cardMetadataMap.delete(existingCard);
+      // Show simple alert/toast (using console for now, maybe custom UI later)
+      console.log(`Updated existing file: ${file.name}`);
+      // Ideally we'd show a toast here, but standard alert is too intrusive for batch operations
+    }
+
     await processFile(file);
+    hasUpdates = true;
   }
+
+  if (hasUpdates) {
+    // Snap to top
+    appContainer.scrollTop = 0;
+  }
+}
+
+function findCardByFilename(filename) {
+  const cards = Array.from(resultsContainer.children);
+  return cards.find(card => {
+    const header = card.querySelector('.info-section h3');
+    return header && header.textContent === filename;
+  });
 }
 
 async function processFile(file) {
@@ -122,7 +150,7 @@ function createResultCard(file, metadata) {
     sdParams = parseStableDiffusionParameters(metadata.parameters);
   }
 
-  // Helper to create info item (Updated for Copy Button placement)
+  // Helper to create info item
   const createInfoItem = (label, content, isHtml = false, rawTextForCopy = null, idPrefix = null) => {
     const item = document.createElement('div');
     item.className = 'info-item';
@@ -135,7 +163,7 @@ function createResultCard(file, metadata) {
     labelSpan.textContent = label;
     labelContainer.appendChild(labelSpan);
 
-    // Copy Button (Now inside Label Container)
+    // Copy Button
     const textToCopy = rawTextForCopy !== null ? rawTextForCopy : (isHtml ? content.replace(/<[^>]*>?/gm, '') : content);
     if (textToCopy && textToCopy !== 'No data') {
       const copyBtn = document.createElement('button');
@@ -213,18 +241,13 @@ function createResultCard(file, metadata) {
   const rawJson = JSON.stringify(metadata, null, 2);
   rawValueDiv.textContent = Object.keys(metadata).length > 0 ? rawJson : "No text chunks found.";
   
-  // Copy button for raw data (Special case, keep inside for now or move to summary?)
-  // Let's move it to summary for consistency? Or keep it inside.
-  // User asked to move Copy button to label area. Summary is kind of a label.
-  // Let's put it in summary.
-  
   if (Object.keys(metadata).length > 0) {
      const copyBtn = document.createElement('button');
       copyBtn.className = 'copy-btn';
       copyBtn.textContent = 'Copy';
       copyBtn.style.marginLeft = '1rem';
       copyBtn.onclick = (e) => {
-        e.preventDefault(); // Prevent toggle details
+        e.preventDefault();
         navigator.clipboard.writeText(rawJson);
         copyBtn.textContent = 'Copied!';
         setTimeout(() => copyBtn.textContent = 'Copy', 2000);
@@ -250,6 +273,8 @@ function updateDiffs() {
 
   if (cards.length < 2) return;
 
+  // In grid layout, "next" card might not be visually "below", but DOM order is preserved.
+  // We compare with the next element in DOM (which is the "older" uploaded file).
   for (let i = 0; i < cards.length - 1; i++) {
     const currentCard = cards[i];
     const nextCard = cards[i + 1];

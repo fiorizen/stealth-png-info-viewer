@@ -100,13 +100,16 @@ body {
 
 #results-container {
   width: 100%;
-  max-width: 1200px;
+  max-width: 1600px;
+  /* Increased max-width for gallery */
   margin: 0 auto;
   padding: 2rem;
   box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(600px, 1fr));
   gap: 2rem;
+  align-items: start;
+  /* Prevent stretching if heights differ */
 }
 
 /* Glassmorphism Card */
@@ -124,6 +127,10 @@ body {
   /* Scroll Snap Item */
   scroll-snap-align: start;
   scroll-margin-top: calc(var(--header-height) + 2rem);
+
+  /* Ensure full height in grid */
+  height: 100%;
+  box-sizing: border-box;
 }
 
 .result-card {

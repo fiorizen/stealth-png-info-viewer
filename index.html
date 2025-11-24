@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Stealth PNG Info Viewer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Fira+Code&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./src/style.css">
+  </head>
+  <body>
+    <div id="app">
+      <h1>Stealth PNG Info</h1>
+      
+      <div id="dropzone" class="glass-card">
+        <span class="icon-upload">📂</span>
+        <p>Drag & Drop PNG file here</p>
+        <p style="font-size: 0.9rem; opacity: 0.7;">or click to select</p>
+        <input type="file" id="fileInput" accept="image/png" style="display: none;">
+      </div>
+
+      <div id="result-area" class="glass-card">
+        <div class="image-container">
+          <img id="preview-image" src="" alt="Uploaded PNG" class="image-preview">
+        </div>
+        <div class="info-section">
+          <h3>Generation Parameters</h3>
+          
+          <div class="info-item">
+            <span class="info-label">Prompt</span>
+            <div class="info-value" id="prompt-display">
+              <span class="placeholder">No data</span>
+            </div>
+          </div>
+
+          <div class="info-item">
+            <span class="info-label">Negative Prompt</span>
+            <div class="info-value" id="negative-prompt-display">
+              <span class="placeholder">No data</span>
+            </div>
+          </div>
+
+          <div class="info-item">
+            <span class="info-label">Other Parameters</span>
+            <div class="info-value" id="other-params-display">
+              <span class="placeholder">No data</span>
+            </div>
+          </div>
+          
+          <div id="raw-metadata" style="margin-top: 2rem;">
+            <h3>Raw Metadata</h3>
+            <div class="info-value" id="raw-data-display" style="font-size: 0.8rem;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <footer>
+      <p>Built with Vite & Vanilla JS. 100% Client-side.</p>
+    </footer>
+
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>

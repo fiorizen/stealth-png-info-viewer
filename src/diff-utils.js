@@ -1,4 +1,15 @@
 /**
+ * Formats BREAK keywords with line breaks.
+ * @param {string} text - Text to format.
+ * @returns {string} Formatted text with <br> tags after BREAK.
+ */
+function formatBreak(text) {
+  // Replace "BREAK, " with "BREAK,<br>" (newline after comma)
+  // Replace "BREAK " or "BREAK" at end with "BREAK<br>"
+  return text.replace(/\bBREAK\s*,\s*/g, 'BREAK,<br>').replace(/\bBREAK(?:\s+|$)/g, 'BREAK<br>');
+}
+
+/**
  * Generates HTML string with diff highlights for the given text compared to neighbor texts.
  * @param {string} currentText - The text to display and highlight.
  * @param {string[]} neighborTexts - Array of texts from neighboring items (prev/next) to compare against.
@@ -6,17 +17,17 @@
  */
 export function generateDiffHtml(currentText, neighborTexts) {
   if (!currentText) return '';
-  if (!neighborTexts || neighborTexts.length === 0) return currentText; // Or should we return formatted text?
-  // If no neighbors, we probably shouldn't highlight anything, but we still want the formatting (newlines).
-  // However, the original logic returned early if no neighbors.
-  // Let's assume if neighborTexts is empty, we just return formatted text without highlights.
+  if (!neighborTexts || neighborTexts.length === 0) {
+    // No neighbors, just format BREAK and return
+    return formatBreak(currentText);
+  }
   
-  // Tokenize logic: Split by comma OR BREAK OR whitespace, capturing the delimiters.
+  // Tokenize logic: Split by comma OR BREAK, capturing the delimiters.
   // We match:
   // 1. Comma with optional whitespace: \s*,\s*
-  // 2. BREAK with optional whitespace: \s*\bBREAK\b\s* (using word boundary to avoid partial matches)
-  // 3. Whitespace: \s+ (to split words)
-  const splitRegex = /(\s*,\s*|\s*\bBREAK\b\s*|\s+)/;
+  // 2. BREAK with optional whitespace: \s*\bBREAK\b\s*
+  // NOTE: We do NOT split on whitespace to keep multi-word phrases together
+  const splitRegex = /(\s*,\s*|\s*\bBREAK\b\s*)/;
   
   // Split and filter out empty strings resulting from adjacent delimiters
   const currentParts = currentText.split(splitRegex).filter(p => p.length > 0);
@@ -36,32 +47,8 @@ export function generateDiffHtml(currentText, neighborTexts) {
     
     // Check if this part is a delimiter
     if (part.match(splitRegex)) {
-      // It's a delimiter (comma, BREAK, or whitespace).
-      let displayPart = part;
-      
-      if (part.includes("BREAK")) {
-          // Check next part for comma
-          const nextPart = currentParts[i+1];
-          const nextIsComma = nextPart && nextPart.match(/^\s*,\s*$/);
-          
-          if (nextIsComma) {
-              displayPart = part; // Don't add <br> yet
-          } else {
-              displayPart = part.replace(/BREAK/, 'BREAK<br>');
-          }
-      } else if (part.match(/^\s*,\s*$/)) {
-          // It's a comma. Check if PREVIOUS part was BREAK.
-          const prevPart = currentParts[i-1];
-          const prevIsBreak = prevPart && prevPart.includes("BREAK");
-          
-          if (prevIsBreak) {
-              // Insert <br> after comma (e.g. ", " -> ",<br> ")
-              displayPart = part.replace(',', ',<br>');
-          }
-      }
-      
-      resultParts.push(displayPart);
-      
+      // It's a delimiter (comma or BREAK) - just pass through
+      resultParts.push(part);
     } else {
       // It's a content token
       const trimmedPart = part.trim();
@@ -90,5 +77,6 @@ export function generateDiffHtml(currentText, neighborTexts) {
     }
   }
   
-  return resultParts.join('');
+  // Apply BREAK formatting after diff highlighting
+  return formatBreak(resultParts.join(''));
 }

@@ -1,13 +1,13 @@
 :root {
-  --bg-color: #0f0c29;
-  --bg-gradient: linear-gradient(300deg, #302b63, #0f0c29, #24243e);
-  --glass-bg: rgba(255, 255, 255, 0.05);
-  --glass-border: rgba(255, 255, 255, 0.1);
+  --bg-color: #1a1d1a;
+  --bg-gradient: linear-gradient(300deg, #2a2d2a, #1a1d1a, #252827);
+  --glass-bg: rgba(255, 255, 255, 0.03);
+  --glass-border: rgba(140, 160, 140, 0.15);
   --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-  --text-primary: #ffffff;
-  --text-secondary: #a0a0a0;
-  --accent-color: #00d2ff;
-  --accent-gradient: linear-gradient(90deg, #00d2ff 0%, #3a7bd5 100%);
+  --text-primary: #e8e8e8;
+  --text-secondary: #9a9a8a;
+  --accent-color: #7a9b76;
+  --accent-gradient: linear-gradient(90deg, #7a9b76 0%, #5a7b56 100%);
   --font-family: 'Inter', sans-serif;
   --header-height: 80px;
 }
@@ -48,7 +48,7 @@ body {
   left: 0;
   width: 100%;
   height: var(--header-height);
-  background: rgba(15, 12, 41, 0.8);
+  background: rgba(26, 29, 26, 0.85);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--glass-border);
@@ -61,11 +61,10 @@ body {
 }
 
 #app-header h1 {
-  font-size: 1.5rem;
+  font-size: 1.2rem;
   margin: 0;
-  background: var(--accent-gradient);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  color: var(--accent-color);
+  font-weight: 500;
 }
 
 .glass-btn {
@@ -260,24 +259,26 @@ details .info-value {
   position: absolute;
   top: 1rem;
   right: 1rem;
-  background: rgba(255, 50, 50, 0.2);
-  border: 1px solid rgba(255, 50, 50, 0.3);
-  color: #ff6b6b;
+  background: rgba(150, 150, 150, 0.08);
+  border: 1px solid rgba(150, 150, 150, 0.15);
+  color: #999;
   border-radius: 50%;
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  font-size: 1.2rem;
+  font-size: 1rem;
   transition: all 0.2s ease;
   z-index: 10;
+  opacity: 0.6;
 }
 
 .remove-btn:hover {
-  background: rgba(255, 50, 50, 0.4);
-  transform: scale(1.1);
+  background: rgba(150, 150, 150, 0.15);
+  opacity: 1;
+  transform: scale(1.05);
 }
 
 /* Diff Highlight */

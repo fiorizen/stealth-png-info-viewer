@@ -317,59 +317,130 @@ function diffText(container, currentText, neighborTexts) {
   if (!container || !currentText) return;
   if (!neighborTexts || neighborTexts.length === 0) return;
   
-  const currentParts = currentText.split(/,\s*/);
+  // Tokenize logic: Split by comma OR BREAK, capturing the delimiters.
+  // We match:
+  // 1. Comma with optional whitespace: \s*,\s*
+  // 2. BREAK with optional whitespace: \s*BREAK\s*
+  // The capturing group () ensures these delimiters are included in the result array.
+  const splitRegex = /(\s*,\s*|\s+BREAK\s*)/;
   
-  // Create Sets for each neighbor for fast lookup
-  const neighborSets = neighborTexts.map(text => new Set(text ? text.split(/,\s*/) : []));
+  const currentParts = currentText.split(splitRegex);
+  
+  // Create Sets for neighbors using the same split logic, but filtering out delimiters to only keep meaningful tokens
+  const neighborSets = neighborTexts.map(text => {
+    if (!text) return new Set();
+    const parts = text.split(splitRegex);
+    // Filter: keep only parts that are NOT delimiters (commas/BREAK) and NOT empty
+    // Actually, we just want to match "content" tokens.
+    // A simple heuristic: if it matches the splitRegex, it's a delimiter.
+    // But splitRegex matches delimiters. So we can test against it.
+    // However, we need to be careful. 'masterpiece' doesn't match. ', ' matches.
+    // ' BREAK ' matches.
+    return new Set(parts.filter(p => !p.match(splitRegex) && p.trim().length > 0).map(p => p.trim()));
+  });
   
   const resultParts = [];
 
   for (let i = 0; i < currentParts.length; i++) {
     const part = currentParts[i];
-    const trimmedPart = part.trim();
     
-    let displayPart = part;
-    
-    // Check if this part is missing in ANY neighbor
-    // "Bidirectional" means: if I am different from neighbor X, highlight me.
-    // If I have neighbor A and B.
-    // If A doesn't have me -> Highlight.
-    // If B doesn't have me -> Highlight.
-    let isDiff = false;
-    
-    if (trimmedPart.length > 0) {
-        for (const neighborSet of neighborSets) {
-            if (!neighborSet.has(trimmedPart)) {
-                isDiff = true;
-                break;
-            }
+    // Check if this part is a delimiter
+    if (part.match(splitRegex)) {
+      // It's a delimiter (comma or BREAK).
+      // Apply formatting for BREAK
+      let displayPart = part;
+      if (part.includes("BREAK")) {
+        // If it's just BREAK or BREAK with spaces
+        // We want to add a newline.
+        // User requested: "BREAK, hoge" -> "BREAK, " -> "hoge" (newline after comma)
+        // If the delimiter is just " BREAK ", we probably want " BREAK<br>"
+        // If the delimiter is " BREAK, ", we want " BREAK, <br>"
+        
+        // Replace BREAK with BREAK<br> but be careful about existing structure
+        // Actually, let's just append <br> if it contains BREAK.
+        // But we need to respect the "newline after comma" rule.
+        // If the delimiter ends with comma, we might want <br> after it?
+        // Wait, "BREAK, " is a delimiter? Yes, \s*BREAK\s* might not match "BREAK, " if comma is separate.
+        // Our regex `(\s*,\s*|\s+BREAK\s*)` treats comma and BREAK as separate delimiters usually,
+        // unless they are adjacent without tokens?
+        // "BREAK, " -> "BREAK" (token?) ", " (delimiter)?
+        // No, BREAK is a keyword, so it should be a delimiter.
+        
+        // Let's refine the regex to be safe.
+        // If we have "BREAK, ", splitRegex `\s+BREAK\s*` matches "BREAK". Then "," matches `\s*,\s*`.
+        // So "BREAK, " becomes ["", "BREAK", "", ", ", ""] (empty strings between matches).
+        
+        // If part contains BREAK, we add <br>.
+        // If it's strictly "BREAK" (plus spaces), we add <br> after.
+        displayPart = part.replace(/BREAK/, 'BREAK<br>');
+      }
+      
+      // If it's a comma, we don't add <br> unless it was requested?
+      // Previous logic: if trimmedPart.endsWith('BREAK') -> separator = ', <br>'
+      // Here, if the PREVIOUS token was BREAK, and this is a comma...
+      // But we are processing linearly.
+      
+      // Let's stick to simple: BREAK always gets a <br> after it.
+      // If the sequence is "BREAK" -> ", ", then "BREAK<br>" -> ", ". Result: "BREAK\n, " -> weird.
+      // User wanted: "BREAK, " -> newline.
+      
+      // If we have "BREAK, ", we want "BREAK, <br>".
+      // This implies we shouldn't put <br> immediately after BREAK if a comma follows.
+      
+      // This is getting complex to do purely in the loop without lookahead.
+      // But let's look at the rendered HTML.
+      // "BREAK<br>, " -> Visual: BREAK (newline) ,
+      // That looks bad. We want BREAK , (newline).
+      
+      // So, if the CURRENT part is BREAK, we only add <br> if the NEXT part is NOT a comma.
+      // If the NEXT part is a comma, we let the comma handle the <br>?
+      // Or we modify the comma.
+      
+      if (part.includes("BREAK")) {
+          // Check next part
+          const nextPart = currentParts[i+1];
+          const nextIsComma = nextPart && nextPart.match(/^\s*,\s*$/);
+          
+          if (nextIsComma) {
+              displayPart = part; // Don't add <br> yet
+          } else {
+              displayPart = part.replace(/BREAK/, 'BREAK<br>');
+          }
+      } else if (part.match(/^\s*,\s*$/)) {
+          // It's a comma. Check if PREVIOUS part was BREAK.
+          const prevPart = currentParts[i-1];
+          const prevIsBreak = prevPart && prevPart.includes("BREAK");
+          
+          if (prevIsBreak) {
+              displayPart = part + '<br>';
+          }
+      }
+      
+      resultParts.push(displayPart);
+      
+    } else {
+      // It's a content token (or empty string from split)
+      const trimmedPart = part.trim();
+      if (trimmedPart.length === 0) {
+        resultParts.push(part); // Preserve whitespace
+        continue;
+      }
+      
+      // Check for diff
+      let isDiff = false;
+      for (const neighborSet of neighborSets) {
+        if (!neighborSet.has(trimmedPart)) {
+            isDiff = true;
+            break;
         }
+      }
+      
+      if (isDiff) {
+        resultParts.push(`<span class="diff-highlight">${part}</span>`);
+      } else {
+        resultParts.push(part);
+      }
     }
-    
-    // Highlight logic
-    if (isDiff) {
-      // Split by BREAK to avoid highlighting it
-      const tokens = part.split(/(BREAK)/);
-      displayPart = tokens.map(token => {
-        if (token === 'BREAK') return token;
-        // Highlight non-whitespace content
-        return token.replace(/(\S+(?:[\s\S]*\S+)?)/, '<span class="diff-highlight">$1</span>');
-      }).join('');
-    }
-
-    // Formatting logic
-    // Internal BREAKs (not at end)
-    displayPart = displayPart.replace(/BREAK(?!\s*$)/g, 'BREAK<br>');
-
-    // Determine separator
-    let separator = (i < currentParts.length - 1) ? ', ' : '';
-    
-    // If part ends with BREAK, put <br> in separator
-    if (trimmedPart.endsWith('BREAK')) {
-      separator = ', <br>';
-    }
-
-    resultParts.push(displayPart + separator);
   }
   
   container.innerHTML = resultParts.join('');

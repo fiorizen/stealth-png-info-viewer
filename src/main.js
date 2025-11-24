@@ -4,7 +4,7 @@ const fileInput = document.getElementById('fileInput');
 const openBtn = document.getElementById('open-btn');
 const resultsContainer = document.getElementById('results-container');
 const dragOverlay = document.getElementById('drag-overlay');
-const appContainer = document.getElementById('app'); // For scroll snapping
+const appContainer = document.getElementById('app');
 
 // Store metadata for diff calculation
 const cardMetadataMap = new Map();
@@ -59,22 +59,17 @@ async function handleFiles(files) {
   const filesArray = Array.from(files);
   let hasUpdates = false;
   
-  // Process in reverse so first selected is top
   for (const file of filesArray) {
     if (file.type !== 'image/png') {
       console.warn(`Skipping non-PNG file: ${file.name}`);
       continue;
     }
     
-    // Check for duplicate filename
     const existingCard = findCardByFilename(file.name);
     if (existingCard) {
-      // Remove old card
       existingCard.remove();
       cardMetadataMap.delete(existingCard);
-      // Show simple alert/toast (using console for now, maybe custom UI later)
       console.log(`Updated existing file: ${file.name}`);
-      // Ideally we'd show a toast here, but standard alert is too intrusive for batch operations
     }
 
     await processFile(file);
@@ -82,7 +77,6 @@ async function handleFiles(files) {
   }
 
   if (hasUpdates) {
-    // Snap to top
     appContainer.scrollTop = 0;
   }
 }
@@ -114,7 +108,6 @@ function createResultCard(file, metadata) {
   
   cardMetadataMap.set(card, metadata);
 
-  // Remove Button
   const removeBtn = document.createElement('div');
   removeBtn.className = 'remove-btn';
   removeBtn.innerHTML = '✕';
@@ -125,7 +118,6 @@ function createResultCard(file, metadata) {
   };
   card.appendChild(removeBtn);
   
-  // Image Column
   const imageContainer = document.createElement('div');
   imageContainer.className = 'image-container';
   const img = document.createElement('img');
@@ -135,7 +127,6 @@ function createResultCard(file, metadata) {
   img.onload = () => URL.revokeObjectURL(objectUrl);
   imageContainer.appendChild(img);
   
-  // Info Column
   const infoSection = document.createElement('div');
   infoSection.className = 'info-section';
   
@@ -150,12 +141,10 @@ function createResultCard(file, metadata) {
     sdParams = parseStableDiffusionParameters(metadata.parameters);
   }
 
-  // Helper to create info item
   const createInfoItem = (label, content, isHtml = false, rawTextForCopy = null, idPrefix = null) => {
     const item = document.createElement('div');
     item.className = 'info-item';
     
-    // Label Container
     const labelContainer = document.createElement('div');
     labelContainer.className = 'info-label';
     
@@ -163,7 +152,6 @@ function createResultCard(file, metadata) {
     labelSpan.textContent = label;
     labelContainer.appendChild(labelSpan);
 
-    // Copy Button
     const textToCopy = rawTextForCopy !== null ? rawTextForCopy : (isHtml ? content.replace(/<[^>]*>?/gm, '') : content);
     if (textToCopy && textToCopy !== 'No data') {
       const copyBtn = document.createElement('button');
@@ -179,7 +167,6 @@ function createResultCard(file, metadata) {
 
     item.appendChild(labelContainer);
     
-    // Value Container
     const valueDiv = document.createElement('div');
     valueDiv.className = 'info-value';
     if (idPrefix) valueDiv.dataset.type = idPrefix;
@@ -196,6 +183,7 @@ function createResultCard(file, metadata) {
 
   if (sdParams) {
     if (sdParams.prompt) {
+      // Initial display formatting (standard)
       const formattedPrompt = sdParams.prompt.replace(/\bBREAK(?:,\s?|\s|\b)/g, '$&<br>');
       infoSection.appendChild(createInfoItem('Prompt', formattedPrompt, true, sdParams.prompt, 'prompt'));
     } else {
@@ -226,7 +214,6 @@ function createResultCard(file, metadata) {
     infoSection.appendChild(createInfoItem('Other Parameters', 'No data'));
   }
 
-  // Raw Metadata
   const details = document.createElement('details');
   details.style.marginTop = '2rem';
   
@@ -273,8 +260,6 @@ function updateDiffs() {
 
   if (cards.length < 2) return;
 
-  // In grid layout, "next" card might not be visually "below", but DOM order is preserved.
-  // We compare with the next element in DOM (which is the "older" uploaded file).
   for (let i = 0; i < cards.length - 1; i++) {
     const currentCard = cards[i];
     const nextCard = cards[i + 1];
@@ -313,32 +298,42 @@ function diffText(container, currentText, nextText) {
   const currentParts = currentText.split(/,\s*/);
   const nextParts = new Set(nextText.split(/,\s*/));
   
-  const newHtmlParts = currentParts.map(part => {
+  const resultParts = [];
+
+  for (let i = 0; i < currentParts.length; i++) {
+    const part = currentParts[i];
+    const trimmedPart = part.trim();
+    
     let displayPart = part;
-    // Format BREAK first
-    if (part.includes("BREAK")) {
-        displayPart = part.replace(/\bBREAK(?:,\s?|\s|\b)/g, '$&<br>');
+    let isDiff = !nextParts.has(trimmedPart);
+    
+    // Highlight logic
+    if (isDiff && trimmedPart.length > 0) {
+      // Split by BREAK to avoid highlighting it
+      const tokens = part.split(/(BREAK)/);
+      displayPart = tokens.map(token => {
+        if (token === 'BREAK') return token;
+        // Highlight non-whitespace content
+        return token.replace(/(\S+(?:[\s\S]*\S+)?)/, '<span class="diff-highlight">$1</span>');
+      }).join('');
     }
 
-    if (!nextParts.has(part.trim())) {
-      // Highlight the part, but exclude "BREAK" keyword from the highlight class
-      // We wrap the whole thing in diff-highlight, but close it before BREAK and reopen after
-      
-      // 1. Wrap BREAK(and <br>) in a marker that closes and reopens the span
-      // The regex matches BREAK followed by optional <br> (added by formatting above)
-      const highlightExclusionRegex = /(\bBREAK(?:<br>)?)/g;
-      
-      // We want the result to be: <span class="diff-highlight">...</span> BREAK<br> <span class="diff-highlight">...</span>
-      // So we replace BREAK with: </span>BREAK<br><span class="diff-highlight">
-      
-      const highlightedContent = displayPart.replace(highlightExclusionRegex, '</span>$1<span class="diff-highlight">');
-      
-      return `<span class="diff-highlight">${highlightedContent}</span>`;
+    // Formatting logic
+    // Internal BREAKs (not at end)
+    displayPart = displayPart.replace(/BREAK(?!\s*$)/g, 'BREAK<br>');
+
+    // Determine separator
+    let separator = (i < currentParts.length - 1) ? ', ' : '';
+    
+    // If part ends with BREAK, put <br> in separator
+    if (trimmedPart.endsWith('BREAK')) {
+      separator = ', <br>';
     }
-    return displayPart;
-  });
+
+    resultParts.push(displayPart + separator);
+  }
   
-  container.innerHTML = newHtmlParts.join(', ');
+  container.innerHTML = resultParts.join('');
 }
 
 function diffParams(container, currentParams, nextParams) {

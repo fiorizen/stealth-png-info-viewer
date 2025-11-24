@@ -58,15 +58,14 @@ export function generateDiffHtml(currentText, neighborTexts) {
       }
       
       // Check for diff
+      // A token should be highlighted if it's missing from ANY neighbor
+      // (i.e., NOT present in ALL neighbors)
       let isDiff = false;
-      // If neighbors exist, check them.
       if (neighborSets.length > 0) {
-        for (const neighborSet of neighborSets) {
-            if (!neighborSet.has(trimmedPart)) {
-                isDiff = true;
-                break;
-            }
-        }
+        // Check if the token exists in ALL neighbor sets
+        const existsInAllNeighbors = neighborSets.every(neighborSet => neighborSet.has(trimmedPart));
+        // If it doesn't exist in all neighbors, it's different
+        isDiff = !existsInAllNeighbors;
       }
       
       if (isDiff) {

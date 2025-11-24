@@ -23,13 +23,14 @@ describe('generateDiffHtml', () => {
     expect(generateDiffHtml(current, [neighbor])).toBe(expected);
   });
 
-  it('should support bidirectional diff (highlight if missing in EITHER neighbor)', () => {
+  it('should support bidirectional diff (highlight if missing from ANY neighbor)', () => {
     const current = 'A, B, C';
     const prev = 'A, C'; // Missing B
     const next = 'A, B'; // Missing C
     
-    // B is missing in prev -> Highlight B
-    // C is missing in next -> Highlight C
+    // B is missing in prev (but present in next) -> Highlight B
+    // C is missing in next (but present in prev) -> Highlight C
+    // With new logic: highlight if missing from ANY neighbor
     const expected = 'A, <span class="diff-highlight">B</span>, <span class="diff-highlight">C</span>';
     expect(generateDiffHtml(current, [prev, next])).toBe(expected);
   });

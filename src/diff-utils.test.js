@@ -74,13 +74,13 @@ describe('generateDiffHtml', () => {
   });
 
   it('should handle user-reported case correctly', () => {
-    const text1 = 'looking up BREAK amazuyu tatsuki, tomose shunsaku BREAK masterpiece';
-    const text2 = 'looking up BREAK mibu natsuki, amazuyu tatsuki BREAK masterpiece';
-    const text3 = 'looking up BREAK misaki kurehito, mibu natsuki BREAK masterpiece';
+    const text1 = 'looking up BREAK alice, bob BREAK masterpiece';
+    const text2 = 'looking up BREAK charlie, alice BREAK masterpiece';
+    const text3 = 'looking up BREAK david, charlie BREAK masterpiece';
     
     // Common to all: "looking up", "masterpiece"
-    // For text2: "mibu natsuki" and "amazuyu tatsuki" are unique -> Both highlighted
-    const expected2 = 'looking up BREAK<br><span class="diff-highlight">mibu natsuki</span>, <span class="diff-highlight">amazuyu tatsuki</span> BREAK<br>masterpiece';
+    // For text2: "charlie" and "alice" are unique -> Both highlighted
+    const expected2 = 'looking up BREAK<br><span class="diff-highlight">charlie</span>, <span class="diff-highlight">alice</span> BREAK<br>masterpiece';
     expect(generateDiffHtml(text2, [text1, text2, text3])).toBe(expected2);
   });
 

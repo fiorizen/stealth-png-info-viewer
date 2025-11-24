@@ -28,9 +28,17 @@ body {
 }
 
 @keyframes gradientBG {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
+  0% {
+    background-position: 0% 50%;
+  }
+
+  50% {
+    background-position: 100% 50%;
+  }
+
+  100% {
+    background-position: 0% 50%;
+  }
 }
 
 #app {
@@ -99,28 +107,41 @@ h1 {
 }
 
 /* Result Area */
-#result-area {
-  display: none; /* Hidden by default */
+#results-container {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.result-card {
+  display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 2rem;
-  animation: fadeIn 0.5s ease;
+  animation: slideDown 0.5s ease;
 }
 
 @media (max-width: 768px) {
-  #result-area {
+  .result-card {
     grid-template-columns: 1fr;
   }
 }
 
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .image-preview {
   width: 100%;
   border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
 }
 
 .info-section h3 {
@@ -152,6 +173,36 @@ h1 {
   white-space: pre-wrap;
   word-break: break-word;
   position: relative;
+}
+
+/* Details / Summary */
+details {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+summary {
+  padding: 1rem;
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--accent-color);
+  user-select: none;
+  transition: background 0.2s;
+}
+
+summary:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+details[open] summary {
+  border-bottom: 1px solid var(--glass-border);
+}
+
+details .info-value {
+  border-radius: 0 0 8px 8px;
+  background: transparent;
+  margin-top: 0;
 }
 
 /* Copy Button */

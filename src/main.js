@@ -4,6 +4,10 @@ const dropzone = document.getElementById('dropzone');
 const fileInput = document.getElementById('fileInput');
 const resultsContainer = document.getElementById('results-container');
 
+// Store metadata for diff calculation
+// Map<CardElement, MetadataObject>
+const cardMetadataMap = new Map();
+
 // Drag & Drop Events
 dropzone.addEventListener('dragover', (e) => {
   e.preventDefault();
@@ -54,6 +58,7 @@ async function processFile(file) {
   try {
     const metadata = await parsePngInfo(file);
     createResultCard(file, metadata);
+    updateDiffs();
   } catch (error) {
     console.error(`Error parsing ${file.name}:`, error);
     alert(`Error parsing ${file.name}: ` + error.message);
@@ -65,6 +70,20 @@ function createResultCard(file, metadata) {
   
   const card = document.createElement('div');
   card.className = 'glass-card result-card';
+  
+  // Store metadata on the card element for easy access during diff
+  cardMetadataMap.set(card, metadata);
+
+  // Remove Button
+  const removeBtn = document.createElement('div');
+  removeBtn.className = 'remove-btn';
+  removeBtn.innerHTML = '✕';
+  removeBtn.onclick = () => {
+    card.remove();
+    cardMetadataMap.delete(card);
+    updateDiffs();
+  };
+  card.appendChild(removeBtn);
   
   // Image Column
   const imageContainer = document.createElement('div');
@@ -94,7 +113,7 @@ function createResultCard(file, metadata) {
   }
 
   // Helper to create info item
-  const createInfoItem = (label, content, isHtml = false, rawTextForCopy = null) => {
+  const createInfoItem = (label, content, isHtml = false, rawTextForCopy = null, idPrefix = null) => {
     const item = document.createElement('div');
     item.className = 'info-item';
     
@@ -105,6 +124,7 @@ function createResultCard(file, metadata) {
     
     const valueDiv = document.createElement('div');
     valueDiv.className = 'info-value';
+    if (idPrefix) valueDiv.dataset.type = idPrefix; // Mark for diffing
     
     if (isHtml) {
       valueDiv.innerHTML = content;
@@ -135,31 +155,31 @@ function createResultCard(file, metadata) {
     if (sdParams.prompt) {
       // Replace BREAK with BREAK<br> for display (handling optional comma/space)
       const formattedPrompt = sdParams.prompt.replace(/\bBREAK(?:,\s?|\s|\b)/g, '$&<br>');
-      infoSection.appendChild(createInfoItem('Prompt', formattedPrompt, true, sdParams.prompt));
+      infoSection.appendChild(createInfoItem('Prompt', formattedPrompt, true, sdParams.prompt, 'prompt'));
     } else {
-      infoSection.appendChild(createInfoItem('Prompt', 'No data'));
+      infoSection.appendChild(createInfoItem('Prompt', 'No data', false, null, 'prompt'));
     }
 
     // Negative Prompt
     if (sdParams.negativePrompt) {
-      infoSection.appendChild(createInfoItem('Negative Prompt', sdParams.negativePrompt));
+      infoSection.appendChild(createInfoItem('Negative Prompt', sdParams.negativePrompt, false, null, 'negativePrompt'));
     } else {
-      infoSection.appendChild(createInfoItem('Negative Prompt', 'No data'));
+      infoSection.appendChild(createInfoItem('Negative Prompt', 'No data', false, null, 'negativePrompt'));
     }
 
     // Other Params
     if (Object.keys(sdParams.params).length > 0) {
       const paramsText = Object.entries(sdParams.params)
-        .map(([k, v]) => `<strong>${k}:</strong> ${v}`)
+        .map(([k, v]) => `<strong>${k}:</strong> <span data-param-key="${k}">${v}</span>`)
         .join('<br>');
       // Construct raw text for copy
       const rawParamsText = Object.entries(sdParams.params)
         .map(([k, v]) => `${k}: ${v}`)
         .join(', ');
         
-      infoSection.appendChild(createInfoItem('Other Parameters', paramsText, true, rawParamsText));
+      infoSection.appendChild(createInfoItem('Other Parameters', paramsText, true, rawParamsText, 'otherParams'));
     } else {
-      infoSection.appendChild(createInfoItem('Other Parameters', 'No data'));
+      infoSection.appendChild(createInfoItem('Other Parameters', 'No data', false, null, 'otherParams'));
     }
   } else {
     infoSection.appendChild(createInfoItem('Prompt', 'No data'));
@@ -203,4 +223,114 @@ function createResultCard(file, metadata) {
 
   // Prepend to container
   resultsContainer.insertBefore(card, resultsContainer.firstChild);
+}
+
+/**
+ * Updates diff highlighting for all cards.
+ * Compares each card with the one immediately following it (the "older" one).
+ */
+function updateDiffs() {
+  const cards = Array.from(resultsContainer.children);
+  
+  // Reset all highlights first
+  document.querySelectorAll('.diff-highlight').forEach(el => {
+    el.classList.remove('diff-highlight');
+  });
+
+  if (cards.length < 2) return;
+
+  for (let i = 0; i < cards.length - 1; i++) {
+    const currentCard = cards[i];
+    const nextCard = cards[i + 1]; // The older card
+    
+    const currentMeta = cardMetadataMap.get(currentCard);
+    const nextMeta = cardMetadataMap.get(nextCard);
+
+    if (!currentMeta || !nextMeta) continue;
+
+    const currentSD = currentMeta.parameters ? parseStableDiffusionParameters(currentMeta.parameters) : null;
+    const nextSD = nextMeta.parameters ? parseStableDiffusionParameters(nextMeta.parameters) : null;
+
+    if (currentSD && nextSD) {
+      // Diff Prompt
+      diffText(
+        currentCard.querySelector('[data-type="prompt"]'),
+        currentSD.prompt,
+        nextSD.prompt
+      );
+
+      // Diff Negative Prompt
+      diffText(
+        currentCard.querySelector('[data-type="negativePrompt"]'),
+        currentSD.negativePrompt,
+        nextSD.negativePrompt
+      );
+
+      // Diff Other Params
+      diffParams(
+        currentCard.querySelector('[data-type="otherParams"]'),
+        currentSD.params,
+        nextSD.params
+      );
+    }
+  }
+}
+
+function diffText(container, currentText, nextText) {
+  if (!container || !currentText || !nextText) return;
+  
+  // Simple diff by comma-separated parts
+  // This re-renders the content to apply highlights
+  
+  const currentParts = currentText.split(/,\s*/);
+  const nextParts = new Set(nextText.split(/,\s*/));
+  
+  // Reconstruct HTML with highlights
+  // Note: We need to preserve BREAK formatting logic here too if we overwrite innerHTML
+  // But for simplicity, let's just highlight segments that are NOT in the nextText
+  
+  // Strategy: We will rebuild the HTML string.
+  // If a part is not in nextParts, wrap it in <span class="diff-highlight">
+  
+  const newHtmlParts = currentParts.map(part => {
+    let displayPart = part;
+    // Handle BREAK formatting
+    if (part.includes("BREAK")) {
+        displayPart = part.replace(/\bBREAK(?:,\s?|\s|\b)/g, '$&<br>');
+    }
+
+    if (!nextParts.has(part.trim())) {
+      return `<span class="diff-highlight">${displayPart}</span>`;
+    }
+    return displayPart;
+  });
+  
+  // Join back with commas, but we need to be careful not to double commas if we split by them
+  // The split removed delimiters. Let's add them back loosely.
+  // Actually, replacing the whole content removes the "Copy" button.
+  // We need to re-append the copy button.
+  
+  const newHtml = newHtmlParts.join(', ');
+  
+  // Preserve copy button
+  const copyBtn = container.querySelector('.copy-btn');
+  container.innerHTML = newHtml;
+  if (copyBtn) container.appendChild(copyBtn);
+}
+
+function diffParams(container, currentParams, nextParams) {
+  if (!container) return;
+  
+  // Iterate over spans with data-param-key
+  const paramSpans = container.querySelectorAll('[data-param-key]');
+  
+  paramSpans.forEach(span => {
+    const key = span.dataset.paramKey;
+    const currentVal = currentParams[key];
+    const nextVal = nextParams[key];
+    
+    if (currentVal !== nextVal) {
+      span.classList.add('diff-highlight');
+    }
+  });
 }

@@ -133,8 +133,8 @@ function createResultCard(file, metadata) {
   if (sdParams) {
     // Prompt with BREAK formatting
     if (sdParams.prompt) {
-      // Replace BREAK with BREAK<br> for display
-      const formattedPrompt = sdParams.prompt.replace(/\bBREAK\b/g, 'BREAK<br>');
+      // Replace BREAK with BREAK<br> for display (handling optional comma/space)
+      const formattedPrompt = sdParams.prompt.replace(/\bBREAK(?:,\s?|\s|\b)/g, '$&<br>');
       infoSection.appendChild(createInfoItem('Prompt', formattedPrompt, true, sdParams.prompt));
     } else {
       infoSection.appendChild(createInfoItem('Prompt', 'No data'));

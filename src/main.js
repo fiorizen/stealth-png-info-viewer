@@ -320,9 +320,9 @@ function diffText(container, currentText, neighborTexts) {
   // Tokenize logic: Split by comma OR BREAK, capturing the delimiters.
   // We match:
   // 1. Comma with optional whitespace: \s*,\s*
-  // 2. BREAK with optional whitespace: \s*BREAK\s*
+  // 2. BREAK with optional whitespace: \s*BREAK\s* (using word boundary to avoid partial matches)
   // The capturing group () ensures these delimiters are included in the result array.
-  const splitRegex = /(\s*,\s*|\s+BREAK\s*)/;
+  const splitRegex = /(\s*,\s*|\s*\bBREAK\b\s*)/;
   
   const currentParts = currentText.split(splitRegex);
   
